@@ -661,30 +661,37 @@ def plot_param_predictions(pred_ratings):
     return fig
 
 
-def plot_probability_heatmap(predictions, param):
+def plot_probability_lineplot(predictions, param):
     if param not in predictions:
         return None
     n = NUM_STATES[param]
     steps = sorted(predictions[param].keys())
-    z = [[round(float(v), 4) for v in predictions[param][j]] for j in steps]
-    xlabels = [f"S{i+1}: {STATE_LABELS[param][i][:20]}" for i in range(n)]
-    fig = go.Figure(go.Heatmap(
-        z=z, x=xlabels, y=[f"j={j}" for j in steps],
-        colorscale="Blues", zmin=0, zmax=1,
-        text=[[f"{v:.3f}" for v in row] for row in z],
-        texttemplate="%{text}", textfont=dict(size=8),
-        hovertemplate="Step %{y}<br>%{x}<br>Prob: %{z:.4f}<extra></extra>",
-        colorbar=dict(title="Prob.", len=0.8),
-    ))
+    colors = [
+        "#4361EE", "#E74C3C", "#1E8449", "#E67E22",
+        "#7209B7", "#154360", "#B7950B", "#C0392B",
+        "#0B2545", "#27AE60",
+    ]
+    fig = go.Figure()
+    for i in range(n):
+        probs = [float(predictions[param][j][i]) for j in steps]
+        fig.add_trace(go.Scatter(
+            x=steps, y=probs,
+            mode="lines+markers",
+            name=f"S{i+1}: {STATE_LABELS[param][i][:30]}",
+            line=dict(width=2, color=colors[i % len(colors)]),
+            marker=dict(size=4),
+            hovertemplate=f"<b>S{i+1}</b><br>Step %{{x}}<br>Prob: %{{y:.4f}}<extra></extra>",
+        ))
     fig.update_layout(
         title=dict(
-            text=f"<b>{PARAM_ICONS[param]} {param}</b> — State Probability Heatmap",
+            text=f"<b>{PARAM_ICONS[param]} {param}</b> — State Probability Evolution",
             font=dict(size=13, color="#1a1a2e"),
         ),
-        xaxis=dict(title="State", tickangle=-35, tickfont=dict(size=8)),
-        yaxis=dict(title="Step (j)", autorange="reversed", tickfont=dict(size=9)),
-        height=530, margin=dict(l=60, r=40, t=55, b=130),
+        xaxis=dict(title="Step (j)", tickmode="linear", dtick=5),
+        yaxis=dict(title="Probability", range=[0, 1.05], showgrid=True, gridcolor="#e8ecf0"),
+        height=500, margin=dict(l=60, r=40, t=55, b=60),
         plot_bgcolor="white", paper_bgcolor="white",
+        legend=dict(font=dict(size=9), orientation="v", x=1.01),
     )
     return fig
 
@@ -819,13 +826,25 @@ for param in PARAMS:
             chosen_states = []
             for obs_i in range(int(n_obs)):
                 with obs_cols[obs_i % n_cols]:
-                    chosen = st.selectbox(
-                        f"Obs #{obs_i + 1}",
-                        options=STATE_OPTIONS[param],
-                        index=NUM_STATES[param] // 2,
-                        key=f"{param}_obs_{obs_i}",
-                    )
-                    chosen_states.append(STATE_OPTIONS[param].index(chosen))
+                    if param == 'RQD':
+                        rqd_val = st.number_input(
+                            f"Obs #{obs_i + 1} (0–100)",
+                            min_value=0, max_value=100, value=50, step=1,
+                            key=f"{param}_obs_{obs_i}",
+                        )
+                        state_idx = next(
+                            (idx for lo, hi, idx in RQD_RANGES if lo <= rqd_val <= hi),
+                            3,
+                        )
+                        chosen_states.append(state_idx)
+                    else:
+                        chosen = st.selectbox(
+                            f"Obs #{obs_i + 1}",
+                            options=STATE_OPTIONS[param],
+                            index=NUM_STATES[param] // 2,
+                            key=f"{param}_obs_{obs_i}",
+                        )
+                        chosen_states.append(STATE_OPTIONS[param].index(chosen))
         param_inputs[param] = chosen_states
         rating_preview = "  |  ".join(
             f"S{si+1} = **{RATINGS[param][si]}**" for si in chosen_states
@@ -929,7 +948,7 @@ if st.session_state.results:
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📈 Q-Value Trend",
         "🔢 Parameter Trends",
-        "🌡️ Probability Heatmaps",
+        "📊 Probability Evolution",
         "📋 Full Table",
         "🏁 Initial State",
     ])
@@ -957,15 +976,15 @@ if st.session_state.results:
         )
 
     with tab3:
-        st.markdown("Colour intensity shows the probability of each state at each step.")
+        st.markdown("Each line shows the probability of a state evolving across 30 steps.")
         param_sel = st.selectbox(
             "Parameter to inspect",
             PARAMS,
             format_func=lambda p: f"{PARAM_ICONS[p]} {p} \u2014 {PARAM_DESCRIPTIONS[p]}",
         )
-        hm = plot_probability_heatmap(predictions, param_sel)
-        if hm:
-            st.plotly_chart(hm, use_container_width=True)
+        lp = plot_probability_lineplot(predictions, param_sel)
+        if lp:
+            st.plotly_chart(lp, use_container_width=True)
         st.markdown(f"**{param_sel} State Reference**")
         st.dataframe(
             pd.DataFrame({
