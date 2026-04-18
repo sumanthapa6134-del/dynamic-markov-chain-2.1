@@ -589,33 +589,40 @@ def build_excel(pred_ratings, predictions, input_summary):
 
 def plot_q_trend(pred_ratings):
     steps = list(range(1, 31))
-    q_vals = [compute_q(pred_ratings, j) for j in steps]
-    qualities = [classify_q(q) for q in q_vals]
+    raw_vals = [compute_q(pred_ratings, j) for j in steps]
+    # Clamp to valid Q range and convert out-of-range / NaN to None (plot gap)
+    q_vals = [
+        max(0.001, min(1000, q)) if (q is not None and not np.isnan(q) and np.isfinite(q)) else None
+        for q in raw_vals
+    ]
+    qualities = [classify_q(q) if q is not None else "N/A" for q in q_vals]
     colors = [Q_BAND_COLORS.get(ql, "#888") for ql in qualities]
     fig = go.Figure()
     bands = [
-        (0.001, 0.01,  "Exceptionally poor", "rgba(123,0,0,0.07)"),
-        (0.01,  0.1,   "Extremely poor",     "rgba(192,57,43,0.07)"),
-        (0.1,   1,     "Very poor",          "rgba(231,76,60,0.07)"),
-        (1,     4,     "Poor",               "rgba(230,126,34,0.07)"),
-        (4,     10,    "Fair",               "rgba(241,196,15,0.07)"),
-        (10,    40,    "Good",               "rgba(46,204,113,0.07)"),
-        (40,    100,   "Very good",          "rgba(26,188,156,0.07)"),
-        (100,   400,   "Extremely good",     "rgba(52,152,219,0.07)"),
+        (0.001, 0.01,  "G — Exceptionally poor", "rgba(123,0,0,0.10)"),
+        (0.01,  0.1,   "F — Extremely poor",     "rgba(192,57,43,0.10)"),
+        (0.1,   1,     "E — Very poor",           "rgba(231,76,60,0.10)"),
+        (1,     4,     "D — Poor",                "rgba(230,126,34,0.10)"),
+        (4,     10,    "C — Fair",                "rgba(241,196,15,0.10)"),
+        (10,    40,    "B — Good",                "rgba(46,204,113,0.10)"),
+        (40,    100,   "A — Very good",           "rgba(26,188,156,0.10)"),
+        (100,   400,   "(A) — Extremely good",    "rgba(52,152,219,0.10)"),
+        (400,   1000,  "(A) — Exceptionally good","rgba(11,37,69,0.10)"),
     ]
     for lo, hi, lbl, fill in bands:
         fig.add_hrect(
             y0=lo, y1=hi, fillcolor=fill, line_width=0,
             annotation_text=lbl, annotation_position="right",
-            annotation=dict(font_size=9, font_color="#555", xanchor="left"),
+            annotation=dict(font_size=9, font_color="#444", xanchor="left"),
         )
     fig.add_trace(go.Scatter(
         x=steps, y=q_vals, mode="lines+markers",
         line=dict(width=3, color="#1a1a2e"),
-        marker=dict(size=8, color=colors, line=dict(width=1.5, color="white")),
+        marker=dict(size=9, color=colors, line=dict(width=1.5, color="white")),
         name="Q value",
         hovertemplate="<b>Step j=%{x}</b><br>Q = %{y:.4f}<br>%{text}<extra></extra>",
         text=qualities,
+        connectgaps=False,
     ))
     fig.update_layout(
         title=dict(
@@ -624,10 +631,15 @@ def plot_q_trend(pred_ratings):
         ),
         xaxis=dict(title="Chainage step (j)", tickmode="linear", dtick=2,
                    showgrid=True, gridcolor="#e8ecf0"),
-        yaxis=dict(title="Q Value (log scale)", type="log",
-                   showgrid=True, gridcolor="#e8ecf0"),
+        yaxis=dict(
+            title="Q Value (log scale)", type="log",
+            range=[-3, 3],
+            tickvals=[0.001, 0.01, 0.1, 1, 4, 10, 40, 100, 400, 1000],
+            ticktext=["0.001", "0.01", "0.1", "1", "4", "10", "40", "100", "400", "1000"],
+            showgrid=True, gridcolor="#e8ecf0",
+        ),
         plot_bgcolor="white", paper_bgcolor="white",
-        height=460, margin=dict(l=60, r=160, t=55, b=55),
+        height=500, margin=dict(l=60, r=200, t=55, b=55),
         hovermode="x unified",
     )
     return fig
