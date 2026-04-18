@@ -599,21 +599,26 @@ def plot_q_trend(pred_ratings):
     colors = [Q_BAND_COLORS.get(ql, "#888") for ql in qualities]
     fig = go.Figure()
     bands = [
-        (0.001, 0.01,  "G — Exceptionally poor", "rgba(123,0,0,0.10)"),
-        (0.01,  0.1,   "F — Extremely poor",     "rgba(192,57,43,0.10)"),
-        (0.1,   1,     "E — Very poor",           "rgba(231,76,60,0.10)"),
-        (1,     4,     "D — Poor",                "rgba(230,126,34,0.10)"),
-        (4,     10,    "C — Fair",                "rgba(241,196,15,0.10)"),
-        (10,    40,    "B — Good",                "rgba(46,204,113,0.10)"),
-        (40,    100,   "A — Very good",           "rgba(26,188,156,0.10)"),
-        (100,   400,   "(A) — Extremely good",    "rgba(52,152,219,0.10)"),
-        (400,   1000,  "(A) — Exceptionally good","rgba(11,37,69,0.10)"),
+        (0.001, 0.01,  "G — Exceptionally poor",  "rgba(123,0,0,0.10)",   "#7B0000"),
+        (0.01,  0.1,   "F — Extremely poor",       "rgba(192,57,43,0.10)", "#C0392B"),
+        (0.1,   1,     "E — Very poor",             "rgba(231,76,60,0.10)", "#E74C3C"),
+        (1,     4,     "D — Poor",                  "rgba(230,126,34,0.10)","#E67E22"),
+        (4,     10,    "C — Fair",                  "rgba(241,196,15,0.10)","#B7950B"),
+        (10,    40,    "B — Good",                  "rgba(46,204,113,0.10)","#1E8449"),
+        (40,    100,   "A — Very good",             "rgba(26,188,156,0.10)","#1A5276"),
+        (100,   400,   "(A) — Extremely good",      "rgba(52,152,219,0.10)","#154360"),
+        (400,   1000,  "(A) — Exceptionally good",  "rgba(11,37,69,0.10)",  "#0B2545"),
     ]
-    for lo, hi, lbl, fill in bands:
-        fig.add_hrect(
-            y0=lo, y1=hi, fillcolor=fill, line_width=0,
-            annotation_text=lbl, annotation_position="right",
-            annotation=dict(font_size=9, font_color="#444", xanchor="left"),
+    for lo, hi, lbl, fill, txt_color in bands:
+        fig.add_hrect(y0=lo, y1=hi, fillcolor=fill, line_width=0)
+        # Geometric midpoint ensures correct vertical centering on log scale
+        y_mid = np.sqrt(lo * hi)
+        fig.add_annotation(
+            x=1.02, y=y_mid,
+            text=lbl, showarrow=False,
+            xanchor="left", yanchor="middle",
+            font=dict(size=9, color=txt_color),
+            xref="paper", yref="y",
         )
     fig.add_trace(go.Scatter(
         x=steps, y=q_vals, mode="lines+markers",
